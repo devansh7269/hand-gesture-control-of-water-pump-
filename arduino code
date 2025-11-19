@@ -1,0 +1,87 @@
+#include <Servo.h>
+
+// Servo objects
+Servo panServo;    // Controls left-right movement
+Servo tiltServo;   // Controls up-down movement  
+
+// Servo angles
+int panAngle = 90;
+int tiltAngle = 90;
+
+// Pin definitions
+const int PAN_PIN = 9;
+const int TILT_PIN = 10;
+const int PUMP_PIN = 11;  // Water pump control pin
+
+// Timing for water pump
+unsigned long lastPumpTime = 0;
+const unsigned long PUMP_DURATION = 1000; // 1 second water flow
+
+void setup() {
+  // Initialize servos
+  panServo.attach(PAN_PIN);
+  tiltServo.attach(TILT_PIN);
+  
+  // Initialize water pump pin
+  pinMode(PUMP_PIN, OUTPUT);
+  digitalWrite(PUMP_PIN, LOW); // Ensure pump is off initially
+  
+  // Center servos
+  panServo.write(panAngle);
+  tiltServo.write(tiltAngle);
+  
+  // Initialize serial communication
+  Serial.begin(9600);
+  Serial.println("Arduino Water Turret Ready!");
+  Serial.println("Commands: PANxxxTILTyyy or TRIGGER");
+}
+
+void loop() {
+  // Check for serial commands
+  if (Serial.available() > 0) {
+    String command = Serial.readStringUntil('\n');
+    command.trim();
+    
+    // Process command
+    if (command.startsWith("PAN") && command.indexOf("TILT") != -1) {
+      // Extract pan and tilt angles
+      int panStart = command.indexOf("PAN") + 3;
+      int tiltStart = command.indexOf("TILT") + 4;
+      
+      String panStr = command.substring(panStart, command.indexOf("TILT"));
+      String tiltStr = command.substring(tiltStart);
+      
+      panAngle = panStr.toInt();
+      tiltAngle = tiltStr.toInt();
+      
+      // Constrain angles to safe limits
+      panAngle = constrain(panAngle, 0, 180);
+      tiltAngle = constrain(tiltAngle, 0, 180);
+      
+      // Move servos
+      panServo.write(panAngle);
+      tiltServo.write(tiltAngle);
+      
+      Serial.print("Moving to - Pan: ");
+      Serial.print(panAngle);
+      Serial.print("°, Tilt: ");
+      Serial.print(tiltAngle);
+      Serial.println("°");
+      
+    } else if (command == "TRIGGER") {
+      activateWaterPump();
+    }
+  }
+  
+  // Turn off pump after duration
+  if (millis() - lastPumpTime > PUMP_DURATION && digitalRead(PUMP_PIN) == HIGH) {
+    digitalWrite(PUMP_PIN, LOW);
+    Serial.println("Water pump OFF");
+  }
+}
+
+void activateWaterPump() {
+  Serial.println("ACTIVATING WATER PUMP!");
+  digitalWrite(PUMP_PIN, HIGH); // Turn on water pump
+  lastPumpTime = millis();
+}
